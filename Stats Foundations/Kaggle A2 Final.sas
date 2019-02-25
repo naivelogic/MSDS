@@ -1,3 +1,10 @@
+****
+Project: Kaggle Ames Sales Price Prediction
+Created by: Phillip Hale
+Teeammembers: William Arnost and Joe Jiang
+
+Import test and train
+****;
 
 data train;  
 infile "/home/philliph0/MSDS 6371 Stats Foundation/Tutorials/Regression/data/train.csv" firstobs=2 dsd;  
@@ -30,59 +37,42 @@ _3SsnPorch ScreenPorch PoolArea PoolQC $	Fence $	MiscFeature $ MiscVal $ MoSold 
 SalePrice = .;
 run;
 
-/* Frequency Plot 
-proc freq data=test order=freq;
-   tables Neighborhood OverallQual OverallCond GarageCars Fireplaces 
-   YearBuilt YearRemodAdd BsmtFullBath BsmtQual
-   MSZoning CentralAir KitchenQual BsmtQual Neighborhood
-   /plots=freqplot;
-run;
-*/
-
-
-
 * Create new data set for all ames data that includes both train and test data for EDA and pre-processing;
 data ames;
 	set train test;
 	
-	** 2 outliers removed with ID 524 and 1299 indicating from reviewing Cooks D showing high leverage.;
+	** 4 outliers removed houses that have sqft > 4000
+	indicating from reviewing Cooks D showing high leverage.;
 	if id = 524 then delete;  
 	if id = 1299 then delete; 
+	if id = 1183 then delete;
+	if id = 692 then delete;
 	
-	
-	** pre-preocessing per clients request to describe square footage by 100;
-	OneFlrSF = OneFlrSF / 100;
-	TwoFlrSF = TwoFlrSF / 100;
-	GrLivArea = GrLivArea/100;
-	LotArea = LotArea / 100;
-	MasVnrArea = MasVnrArea / 100;
-	GarageArea = GarageArea/100;
-	
-	** from Joe;
-	WoodDeckSF = WoodDeckSF/100;
-	OpenPorchSF = OpenPorchSF/100;
-	EnclosedPorch = EnclosedPorch/100;
-	_3SsnPorch = _3SsnPorch/100;
-	ScreenPorch = ScreenPorch/100;
-	PoolArea = PoolArea/100;
-	
-	
-	** cleaning up NA from analysis;
+	** cleaning up NA from analysis setting empty values to the most frequent type that 
+	made the most sense depending on the category or if there were many NA just set to None;
 	if Exterior1st = "NA" 	then 	Exterior1st="Wd Sdng";
+	if Exterior2nd="NA" 	then Exterior2nd= "Wd Shng";
 	if BsmtCond = "NA" 		then 	BsmtCond="None";
 	if MasVnrType="NA" 		then 	MasVnrType="None";
 	if KitchenQual="NA" 	then 	KitchenQual="TA";
 	if Functional="NA" 		then 	Functional="None";
 	if FireplaceQu="NA" 	then 	FireplaceQu="None";
 	if BsmtFinSF1="NA" 		then 	BsmtFinSF1=0;
+	if BsmtFinSF2="NA"   then BsmtFinSF2=0;
 	if BsmtFinType2="NA" then BsmtFinType2="None";
 	if GarageType="NA" then GarageType="None";
 	if BsmtQual="NA" then BsmtQual="None";
-	if BsmtCond="NA" then BsmtCond="None";
+	
 	if SaleType ='NA' then SaleType = 'None';
 	if GarageArea="NA" then GarageArea=0;
+	if BsmtExposure="NA" then BsmtExposure="None";
+	if BsmtFinType1="NA" then BsmtFinType1="None";
+	if GarageFinish="NA" then GarageFinish="None";
+	if MSZoning="NA" then MSZoning="RL";
+
 	
-	** NA clean up from Joe;
+	** Data Manipulation on indicator varibles that teammate Joe
+		performed analysis that proved to have better indication rather seeing values to 0 ;
 	if YrSold >2007 then YrSold = 2008;
 	if OverallQual <3 then OverallQual =2;
  	if OverallCond <4 then OverallCond =3;
@@ -95,18 +85,12 @@ data ames;
  	if _3SsnPorch > 0 then _3SsnPorch =1;
  	if ScreenPorch > 0 then ScreenPorch =1;
  	if PoolArea > 0 then PoolArea =1;	
- 	if Electrical ne 'SBrkr' then Electrical = 'Fuse';
-	
-	** pre-processing from Joe;
-	if MSSubClass = 150 then MSSubClass = 120;
-	if MSSubClass = 150 then MSSubClass = 120;
-	if MSZoning = 'NA' then MSZoning = 'RL';
-	if LotArea >200 then lotArea = 1; else LotArea = 0;
+ 	if Electrical 'SBrkr' then Electrical = 'Fuse';
+ 	if Utilities = 'NA' then Utilities = 'AllPub';
+ 
+ 	if MSSubClass = 150 then MSSubClass = 120;
 	if YearBuilt <1950  then YearBuilt =1949;
 	YearBuilt = floor((2010 -YearBuilt)/10);
-	YearRemodAdd =floor((2010 -YearRemodAdd)/10);
-	if BsmtFinSF1 =. then  BsmtFinSF1 =0;
-	if BsmtFinSF2 = . then BsmtFinSF2= 0;
 	if BsmtUnfSF = . then BsmtUnfSF = 0; 
 	if TotalBsmtSF =. then TotalBsmtSF =0;
 	if FullBath >3 then FullBath =3;
@@ -120,243 +104,111 @@ data ames;
 	if MasVnrArea = . then MasVnrArea = 0;
 	if MasVnrType = "NA" then MasVnrType = "None";
 	if GarageArea =. then GarageArea =0;
+	if GarageQual="NA" then GarageQual="None";
+	if GarageCond="NA" then GarageCond="None";
 	
-	
-	** drop colmns that have too many NA or categories with the majority of one factor that the variable is just not useful;
+	** drop colmns that have too many NA or categories with the majority of 
+	one factor that the variable is just not useful;
 	Drop PoolQC;
+	Drop Fence; 
 	Drop Alley; 
 	Drop MiscFeature;
 	Drop Utilities;
-	
-	** log transformation;	
-	logSalePrice =log(SalePrice);
-	MasVnrArea_log = log(MasVnrArea);
-	LotArea_log = log(LotArea + 1);
-	sqft_log = log(GrLivArea);
-	BsmtFinSF1_log = log(BsmtFinSF1);
-	GarageArea_log = log(GarageArea);
-	poolarea_log = log(PoolArea + 1);
-	TotalBsmtSF_log = log(TotalBsmtSF + 1);
-	LotArea_log = log(LotArea +1);
-	OneFlrSF_log = log(OneFlrSF + 1);
-	TwoFlrSF_log = log(TwoFlrSF);
-	BsmtFinSF2_log = log(BsmtFinSF2);
-	BsmtUnfSF_log = log(BsmtUnfSF +1);
-	sqft_full = GrLivArea + GarageArea + TotalBsmtSF;
-	sqft_full_log = log(sqft_full);
 run;
-
-
-/***************filling missing LotFrontage (NA) with mean***********************/
 
 data ames;
-	set ames;
-	if LotFrontage = 'NA' then LotFrontage1 = .; else LotFrontage1 = LotFrontage+0;
-run;
-
-proc stdize data=ames reponly method=mean out=ames;
-var LotFrontage1;
-run;
-
-data ames (rename= (LotFrontage1 = LotFrontage));
-	set ames (drop=LotFrontage);
-	LotFrontage_log = log(LotFrontage + 1);
+ set ames;
+	** pre-preocessing per clients request to describe square footage by 100;
+	OneFlrSF = OneFlrSF / 100;
+	TwoFlrSF = TwoFlrSF / 100;
+	GrLivArea = GrLivArea/100;
+	LotArea = LotArea / 100;
+	MasVnrArea = MasVnrArea / 100;
+	GarageArea = GarageArea/100;
+	WoodDeckSF = WoodDeckSF/100;
+	OpenPorchSF = OpenPorchSF/100;
+	EnclosedPorch = EnclosedPorch/100;
+	_3SsnPorch = _3SsnPorch/100;
+	ScreenPorch = ScreenPorch/100;
+	PoolArea = PoolArea/100;
 	
+	** log transformation (most was performed during EDA);	
+	logSalePrice =log(SalePrice);
+	LotArea_log = log(LotArea);
+	sqft_log = log(GrLivArea);
+	BsmtFinSF1_log = log(BsmtFinSF1 + 1);
+	GarageArea_log = log(GarageArea +1);
+	poolarea_log = log(PoolArea + 1);
+	TotalBsmtSF_log = log(TotalBsmtSF + 1);
+	OneFlrSF_log = log(OneFlrSF + 1);
+	TwoFlrSF_log = log(TwoFlrSF + 1);
+	BedroomAbvGr_log  = log(BedroomAbvGr);
+	TotRmsAbvGrd_log = log(TotRmsAbvGrd );
 run;
 
+
+** Frequency Analysis to identify NA in test for categorica;
+proc freq data=ames order=freq;
+   tables LotShape Condition1 Condition2 BldgType Neighborhood Exterior1st Exterior2nd  ExterCond BsmtExposure 
+			BsmtFinType1 HeatingQC CentralAir Functional BsmtQual GarageFinish PavedDrive SaleCondition YrSold HouseStyle GarageType
+			 BsmtFinType2 Functional OverallQual OverallCond 
+   /plots=freqplot;
+run;
+
+
+** Multicolinarity and VIF;
+ proc reg data=ames;
+  model logSalePrice = sqft_log LotArea LotArea_log BsmtFinSF1 GarageArea OverallCond OverallQual Fireplaces 
+	GarageCars YearBuilt  GarageYrBlt /partial  tol vif;
+ run;
 
 *************************************************************************************************
       ------------------------ M O D E L    S E L E C T I O N ------------------------ 
+      ------------------------ B A C K W A R D     S E L E C T I O N ----------------- 
 *************************************************************************************************
 ;
 
-**
-      ------------------------ F O R W A R D     S E L E C T I O N ------------------------ 
-**
-*forward - start with no predictor variables and add the best variable at each step and intereate
-Friday Update
-
- BsmtFinType2 BsmtFinType2 GarageCond GarageCond GarageType GarageType
-
-bad - LotFrontage_log 
-
-removed - BsmtFinSF1 MasVnrArea
-;
-
-	    
 ods graphics on;
-proc glmselect data = ames plots(stepAxis=number)=(criterionPanel ASEPlot ASE); partition fraction(validate = 0.2 test = 0.2);
-	class Neighborhood MSSubClass MSZoning ExterQual Condition1 Condition2 BldgType Street LotShape LandContour LotConfig LandSlope
+proc glmselect data = ames plots=all seed=123; partition fraction(validate = 0.2 test = 0.2);
+	class Neighborhood  MSZoning ExterQual Condition1 Condition2 BldgType Street LotShape LandContour LotConfig LandSlope
 		ExterCond BsmtQual MasVnrType BsmtCond BsmtExposure Heating HeatingQC CentralAir Electrical KitchenQual Functional RoofStyle RoofMatl 
 		Exterior1st Exterior2nd Foundation BsmtFinType1	PoolArea FireplaceQu  GarageFinish GarageQual  PavedDrive HouseStyle
-		SaleCondition YrSold _3SsnPorch; 
+		SaleCondition YrSold _3SsnPorch GarageType GarageCond BsmtFinType2 SaleType MSSubClass; 
 
-	model logSalePrice =  LotArea Neighborhood OverallQual YearBuilt  Foundation OverallCond  sqft_log BsmtFinSF1_log   GarageArea_log 
-	MasVnrArea_log LotArea_log YearRemodAdd GarageCars
-	     
-	    MSSubClass MSZoning Street LotShape Condition1 Condition2 BldgType RoofStyle RoofMatl Exterior1st Exterior2nd MasVnrType ExterQual ExterCond BsmtQual
-	    BsmtCond BsmtExposure BsmtFinType1  Heating HeatingQC CentralAir Electrical KitchenQual Functional FireplaceQu 
-		 GarageFinish GarageQual  PavedDrive SaleCondition _3SsnPorch PoolArea YrSold HouseStyle
-	    
-	    / selection=forward (select=AIC stop=AIC) CVdetails showpvalues hierarchy=single stat=all;	
-	
-	output out = forward_results_output p = Predict;
-	run; quit;
-	ods graphics off;
-
-**--- BEST MODEL --- Friday Night PM
-- FoundationPConc  BsmtQualGd GarageTypeAttchd;
-ODS GRAPHICS ON / ATTRPRIORITY=NONE; 
-proc glm data = ames plots=all;
-	class OverallQual SaleCondition Foundation Condition1 FireplaceQu CentralAir Neighborhood;
-	model logSalePrice = sqft_log LotArea_log BsmtFinSF1_log GarageArea_log OverallCond OverallQual TwoFlrSF_log Neighborhood CentralAir Fireplaces  
-	YearBuilt YearRemodAdd sqft_log*Neighborhood OverallCond*SaleCondition/ tolerance solution  ;
-	output out = kaggle_results p=predict PRESS=CSVPress;
-	
-run;quit;ODS GRAPHICS OFF;
-
-**** Results and ANOVA for VIF;
-proc reg data=ames;
-  model logSalePrice = sqft_log LotArea_log BsmtFinSF1_log GarageArea_log OverallCond OverallQual TwoFlrSF_log Fireplaces  
-	YearBuilt YearRemodAdd  /partial vif;
-run;
-
-
-** Prediction on Test;
-data forward_results;
-	set kaggle_results;
-		if Predict > 0 then logSalePrice = Predict;
-		if Predict < 0 or Predict = '.' then logSalePrice = log(180921.1959); ** if empty or 0 set sales price to avg;
-		SalePrice = exp(logSalePrice);
-	keep Id SalePrice;
-	where Id > 1460;
-	run;
- proc export data=forward_results dbms=csv 
- 	OUTFILE= "/home/philliph0/MSDS 6371 Stats Foundation/Tutorials/Regression/Kaggle Project/forward_results.csv" replace; 
- run;
-
-
-
-
-**
-      ------------------------ B A C K W A R D     S E L E C T I O N ------------------------ 
-**
-;
-
-ods graphics on;
-proc glmselect data = ames plots=all; partition fraction(test = 0.2);
-	class Neighborhood MSSubClass MSZoning ExterQual Condition1 Condition2 BldgType Street LotShape LandContour LotConfig LandSlope
-		ExterCond BsmtQual MasVnrType BsmtCond BsmtExposure Heating HeatingQC CentralAir Electrical KitchenQual Functional RoofStyle RoofMatl 
-		Exterior1st Exterior2nd Foundation BsmtFinType1	PoolArea FireplaceQu  GarageFinish GarageQual  PavedDrive HouseStyle
-		SaleCondition YrSold _3SsnPorch GarageType GarageCond BsmtFinType2 SaleType; 
-
-	model logSalePrice =  LotArea Neighborhood OverallQual YearBuilt  Foundation OverallCond  sqft_log BsmtFinSF1_log   GarageArea_log 
-	MasVnrArea_log LotArea_log YearRemodAdd GarageCars MSSubClass MSZoning Street LotShape Condition1 Condition2 BldgType RoofStyle KitchenAbvGr
+	model logSalePrice =  sqft_log LotArea_log OverallQual  OverallCond YearBuilt BsmtFinSF1  Fireplaces       
+	BedroomAbvGr GarageCars  MSZoning Street LotShape Condition1 Condition2 BldgType RoofStyle KitchenAbvGr Neighborhood
 	RoofMatl Exterior1st Exterior2nd MasVnrType ExterQual ExterCond BsmtQual BsmtCond BsmtExposure BsmtFinType1  Heating HeatingQC CentralAir 
 	Electrical KitchenQual Functional FireplaceQu GarageFinish GarageQual  PavedDrive SaleCondition _3SsnPorch PoolArea YrSold HouseStyle 
-	GarageType GarageCond LotArea_log LandContour LotConfig LandSlope  BsmtFinType2 BedroomAbvGr  TotRmsAbvGrd Fireplaces GarageYrBlt SaleType
-	    
-	/ selection=backward (select=AIC stop=AIC) CVdetails showpvalues hierarchy=single stat=all;	
-	
+	GarageType GarageCond LandContour LotConfig LandSlope  BsmtFinType2   SaleType MSSubClass 
+	Foundation YearRemodAdd   GarageYrBlt GarageArea 	TotRmsAbvGrd
+	/selection=backward (select =aic stop=aic choose=cv ) cvdetails = cvpress showpvalues stats=all;
 	output out = backward_results_output p = Predict;
 	run; quit;
 ods graphics off;
 
-**
-sqft_log  LotArea  OverallQual BsmtFinSF1_log MSZoning FV Condition1 PosN SaleCondition Family
-;
-
-ODS GRAPHICS ON / ATTRPRIORITY=NONE; 
-proc glmselect data = ames plots=all;partition fraction(test = 0.2);
-	class OverallQual SaleCondition Foundation Condition1 FireplaceQu CentralAir Neighborhood;
-	model logSalePrice = sqft_log LotArea_log BsmtFinSF1_log GarageArea_log OverallCond OverallQual TwoFlrSF_log Neighborhood CentralAir Fireplaces  
-	YearBuilt YearRemodAdd
-	/ selection=backward (select=AIC stop=AIC) CVdetails showpvalues hierarchy=single stat=all;	
-	
-	output out = backward_results_output p = Predict;
-	run; quit;
-	
-run;quit;ODS GRAPHICS OFF;
-
-ODS GRAPHICS ON / ATTRPRIORITY=NONE; 
+ods graphics on;
 proc glm data = ames plots=all;
-	class OverallQual SaleCondition Foundation Condition1 FireplaceQu CentralAir Neighborhood;
-	model logSalePrice = sqft_log LotArea_log BsmtFinSF1_log GarageArea_log OverallCond OverallQual TwoFlrSF_log Neighborhood CentralAir Fireplaces  
-	YearBuilt YearRemodAdd sqft_log*Neighborhood OverallCond*SaleCondition/ tolerance solution  ;
+	class Neighborhood  CentralAir;
+	model logSalePrice = sqft_log LotArea_log OverallQual OverallCond BsmtFinSF1  Neighborhood Fireplaces  GarageCars      
+			 CentralAir YearBuilt / tolerance solution clparm ;
 	output out = backward_results_output p=predict PRESS=CSVPress;
 	
-run;quit;ODS GRAPHICS OFF;
-
+run;quit;ods graphics off;
 
 ** Prediction on Test;
 data backward_results;
 	set backward_results_output;
-		if Predict > 0 then logSalePrice = Predict;
-		if Predict < 0 or Predict = '.' then logSalePrice = log(180921.1959); ** if empty or 0 set sales price to avg;
-		SalePrice = exp(logSalePrice);
+	logSalePrice = Predict;
+	SalePrice = exp(logSalePrice);
 	keep Id SalePrice;
 	where Id > 1460;
 	run;
  proc export data=backward_results dbms=csv 
  	OUTFILE= "/home/philliph0/MSDS 6371 Stats Foundation/Tutorials/Regression/Kaggle Project/backward_results.csv" replace; 
  run;
-
-
-
-**** Results and ANOVA for VIF;
-proc reg data=ames;
-  model logSalePrice = sqft_log LotArea_log BsmtFinSF1_log GarageArea_log OverallCond OverallQual TwoFlrSF_log Fireplaces  
-	YearBuilt YearRemodAdd  /partial vif;
-run;
-**** Confusion MNatrix for inquestion factor variables;
-proc freq data=ames; table Condition1*Condition2; run;
-
-
-**
-      ------------------------ S T E P - W I S E    S E L E C T I O N ------------------------ 
-**
-
-ods graphics on;
-proc glmselect data = ames plots(stepAxis=number)=(criterionPanel ASEPlot ASE); partition fraction(validate = 0.2 test = 0.2);
-	class Neighborhood MSSubClass MSZoning ExterQual Condition1 Condition2 BldgType Street LotShape LandContour LotConfig LandSlope
-		ExterCond BsmtQual MasVnrType BsmtCond BsmtExposure Heating HeatingQC CentralAir Electrical KitchenQual Functional RoofStyle RoofMatl 
-		Exterior1st Exterior2nd Foundation BsmtFinType1	PoolArea FireplaceQu  GarageFinish GarageQual  PavedDrive HouseStyle
-		SaleCondition YrSold _3SsnPorch; 
-
-	model logSalePrice =  LotArea Neighborhood OverallQual YearBuilt  Foundation OverallCond  sqft_log BsmtFinSF1_log   GarageArea_log 
-	MasVnrArea_log LotArea_log YearRemodAdd GarageCars MSSubClass MSZoning Street LotShape Condition1 Condition2 BldgType RoofStyle 
-	RoofMatl Exterior1st Exterior2nd MasVnrType ExterQual ExterCond BsmtQual BsmtCond BsmtExposure BsmtFinType1  Heating HeatingQC CentralAir 
-	Electrical KitchenQual Functional FireplaceQu GarageFinish GarageQual  PavedDrive SaleCondition _3SsnPorch PoolArea YrSold HouseStyle
-	    
-	/ selection=stepwise (select=AIC stop=AIC) CVdetails showpvalues hierarchy=single stat=all;	
-	
-	output out = stepwise_results_output p = Predict;
-	run; quit;
-ods graphics off;
-
-
-
-**
-      ------------------------ C U S T O M - WIP :   L A S S O   S E L E C T I O N ------------------------ 
-Friday Night
-**
-;
-
-ods graphics on;
-proc glmselect data = ames plots(stepAxis=number)=(criterionPanel ASEPlot ASE); partition fraction(validate = 0.2 test = 0.2);
-	class Neighborhood MSSubClass MSZoning ExterQual Condition1 Condition2 BldgType Street LotShape LandContour LotConfig LandSlope
-		ExterCond BsmtQual MasVnrType BsmtCond BsmtExposure Heating HeatingQC CentralAir Electrical KitchenQual Functional RoofStyle RoofMatl 
-		Exterior1st Exterior2nd Foundation BsmtFinType1	PoolArea FireplaceQu  GarageFinish GarageQual  PavedDrive HouseStyle
-		SaleCondition YrSold _3SsnPorch; 
-
-	model logSalePrice =  LotArea Neighborhood OverallQual YearBuilt  Foundation OverallCond  sqft_log BsmtFinSF1_log   GarageArea_log 
-	MasVnrArea_log LotArea_log YearRemodAdd GarageCars MSSubClass MSZoning Street LotShape Condition1 Condition2 BldgType RoofStyle 
-	RoofMatl Exterior1st Exterior2nd MasVnrType ExterQual ExterCond BsmtQual BsmtCond BsmtExposure BsmtFinType1  Heating HeatingQC CentralAir 
-	Electrical KitchenQual Functional FireplaceQu GarageFinish GarageQual  PavedDrive SaleCondition _3SsnPorch PoolArea YrSold HouseStyle
-	    
-	/ selection=lasso (select=AIC stop=AIC) CVdetails showpvalues hierarchy=single stat=all;	
-	
-	output out = LASSO_results_output p = Predict;
-	run; quit;
-ods graphics off;
-
+ 
+ 
+ ** save new data;
+ proc export data=ames dbms=csv 
+ 	OUTFILE= "/home/philliph0/MSDS 6371 Stats Foundation/Tutorials/Regression/Kaggle Project/ames_for_correlation.csv" replace; 
+ run;
