@@ -10,3 +10,6 @@ Hi I am a student @SMU going through the datascience masters program. Here you'l
 - ANOVA
 - Visualizations
 - Linear Modeling
+
+
+Kaggle - Ames Iowa - [Backward Regression Perdiciton](https://github.com/naivelogic/MSDS/blob/master/Stats%20Foundations/Kaggle%20A2%20Final.sas) Kaggle Score 0.13326
