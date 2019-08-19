@@ -354,18 +354,6 @@ From the KNN we obtained an accuracy rating of 82% on the test dataset. The Sens
 
 
 
-## Naive Bayes
-
-```{r}
-library(e1071)
-nb = naiveBayes(Attrition ~ OverTime+MonthlyIncome  +JobLevel+ MaritalStatus + TotalWorkingYears +StockOptionLevel + YearsWithCurrManager+YearsAtCompany + Age, data=train)
-
-nb_pred = predict(nb, newdata=test)
-#nb_pred = ifelse(nb_pred > 0.5,1,0)
-#table(nb_pred, test$Attrition)
-
-
-```
 
 
 
@@ -384,7 +372,7 @@ summary(stepwise)
 ___test train__
 
 ```{r}
-df$TotalWorkingYears_log = log(df$TotalWorkingYears_log+0.5)
+df$TotalWorkingYears_log = log(df$TotalWorkingYears+0.5)
 
 smp_size <- floor(0.7 * nrow(df))
 
