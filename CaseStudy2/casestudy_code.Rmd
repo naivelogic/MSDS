@@ -1,0 +1,478 @@
+---
+title: "R Notebook - Case Study 2"
+output:
+  html_document:
+    df_print: paged
+---
+
+__Objective__
+
+We have been hired by the __DDSAnalytics__ that specializes in talent management solutions for Fortune 100 companies, with the objective of predicting employee turnover using the existing employee data. These objectives include:
+1. identify top 3 factors that lead to attrition
+2. job role specific treands _(e.g., highest job satisfaction)_
+3. build a model to predict attrition
+
+
+__Executive Summary__
+In summary to the objective, we found:
+
+* Employee attrition– whre employees that were most likely to turnover are those that (1) most importantly workovertime and (2) have lower salaries. Also, we saw decreased in job involvement and increased time_till_promotion. 
+* In terms of monthly income – Job Role and Job Level were key to predicting salary
+* Age and Gender – Good news!  Yall are on the right track with employee management as both Age and Gender were not significant factors or indicators used in the models. We would indicate that there is a slight tendacy for those younger  in age to be more likely to leave. This was appartent in the Employee attrition model werhe maritial status = single, but Age itself was not a key factor. Contrary to other industries, the dataset provided indicated no significant indication gender was a key factor in turnover or a wage gap.
+
+
+```{r}
+library(caret) 
+library(class)
+library(fastDummies) # https://cran.r-project.org/web/packages/fastDummies/vignettes/making-dummy-variables.html
+library(data.table)
+
+df = read.csv("./data/casestudy2data.csv")
+str(df)
+```
+
+From the above output of the current dataset characteristics, we have 870 observations (rows of employees) and 36 variable. In efforts to predict employee turnover, we will utilize the `Attrition` factor as our response variable and the remaining variables as canidate predictor variables.
+
+
+
+Next we explore to see if therea re missing values in the data set.
+
+
+```{r}
+sapply(df, function(x) sum(is.na(x)))
+```
+There does not appear to be any missing variables that we have to handel. 
+
+Next we do some exploration on the leangh of time employees spend at the company
+
+```{r}
+plot(df$YearsAtCompany);summary(df$YearsAtCompany)
+```
+
+it appears employees typically spend around 5-7 years at Telnet. 
+
+
+drop columns we dont need
+```{r}
+columns_to_drop = c("ID", "EmployeeNumber", "Over18", "StandardHours", "EmployeeCount" )
+df = df[,!(names(df) %in% columns_to_drop)]
+```
+
+
+```{r}
+library(ggplot2)
+theme_set(theme_minimal())  # pre-set the bw theme.
+# inspiration - http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html
+
+g <- ggplot(df, aes(JobRole))
+g + geom_bar(aes(fill=Attrition), width = 0.5) + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Histogram on Job Role and Attrition") 
+```
+
+looks like we should do a log transformaiton
+```{r}
+hist(df$MonthlyIncome)
+```
+__log Trasformaitons__
+```{r}
+#attach(df)
+df$Attrition <- factor(df$Attrition)
+df$MonthlyIncome = log(df$MonthlyIncome)
+df$Attrition = as.numeric(as.factor(df$Attrition))-1
+```
+
+
+
+
+
+```{r}
+library(corrplot)
+number_variables = sapply(df, is.numeric) 
+corrmatrix =  cor(df[,number_variables], )
+#top = colnames(corrmatrix)[apply(corrmatrix, 1, function (x) which(x==max(x[abs(x)>.9])))]
+#corrmatrix =  cor(df[,top], )
+corrplot(corrmatrix, method="color")
+```
+
+
+
+```{r}
+library(gridExtra)
+library(ggplot2)
+
+# https://stackoverflow.com/questions/19835987/display-frequency-instead-of-count-with-geom-bar-in-ggplot
+
+graph1= ggplot(df, aes(x=EducationField)) + 
+  geom_bar(aes(y = ..prop.., group=1)) + 
+  ggtitle("EducationField") + 
+  xlab("EducationField") + 
+  coord_flip()
+
+graph2= ggplot(df, aes(x=JobRole)) + 
+  geom_bar(aes(y = ..prop.., group=1)) + 
+  ggtitle("JobRole") + 
+  xlab("JobRole") + 
+  coord_flip()
+
+graph3 = ggplot(df, aes(x=MaritalStatus)) + 
+  geom_bar(aes(y = ..prop.., group=1)) + 
+  ggtitle("MaritalStatus") + 
+  xlab("MaritalStatus") + 
+  coord_flip()
+
+
+graph4 = ggplot(df, aes(x=JobRole)) + 
+  geom_bar(aes(y = ..prop.., group=1)) + 
+  ggtitle("JobRole") + 
+  xlab("JobRole") + 
+  coord_flip()
+
+graph5 = ggplot(df, aes(x=Department)) + 
+  geom_bar(aes(y = ..prop.., group=1)) + 
+  ggtitle("Department") + 
+  xlab("Department") + 
+  coord_flip()
+
+graph6 = ggplot(df, aes(x=BusinessTravel)) + 
+  geom_bar(aes(y = ..prop.., group=1)) + 
+  ggtitle("BusinessTravel") + 
+  xlab("BusinessTravel") + 
+  coord_flip()
+
+grid.arrange(graph1, graph2, graph3, graph4,
+             graph5, graph6, ncol=2)
+```
+
+
+
+# Model Fitting
+
+
+
+
+```{r}
+stepwise = step(glm(Attrition ~ ., data=df, family = binomial(link="logit")), trace=0, direction='both',test="Chisq")
+formula(stepwise)
+summary(stepwise)
+```
+
+__test train split__
+
+```{r}
+smp_size <- floor(0.7 * nrow(df))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+
+train = df[train_ind,]
+test =  df[-train_ind,]
+dim(train)
+dim(test)
+```
+
+
+
+
+
+### Logistic Model
+after several stepwise regression and model selection experiments... 
+
+```{r}
+
+logit_model <- glm(Attrition ~ OverTime+MonthlyIncome + MaritalStatus + JobInvolvement+JobRole ,
+                   family=binomial(link="logit"),data=train)
+logit_pred = predict(logit_model, newdata=test, type='response')
+logit_pred = ifelse(logit_pred > 0.5 ,1,0)
+print(summary(logit_model))
+
+
+cm = table(logit_pred,test$Attrition)
+print(cm)
+
+tn = cm[1]
+fn = cm[2]
+fp = cm[3]
+tp = cm[4]
+
+
+
+
+sensitivity = tp / (tp + fn)
+specificity = tn / (tn + fp)
+accuracy = (tp + tn) / (tp + tn + fp + fn)
+misclassification_rate = 1 - accuracy
+
+print(paste("sensitivity: ", round(sensitivity,2)))
+print(paste("specificity: ", round(specificity,2)))
+print(paste("accuracy: ", round(accuracy,2)))
+
+anova(logit_model,  test="Chisq")
+```
+
+                               Estimate Std. Error z value Pr(>|z|)    
+(Intercept)                     8.52360    3.65533   2.332 0.019710 *  
+OverTimeYes                     1.88546    0.27330   6.899 5.24e-12 ***
+MonthlyIncome                  -1.34196    0.40549  -3.309 0.000935 ***
+MaritalStatusMarried            1.32144    0.48955   2.699 0.006948 ** 
+MaritalStatusSingle             1.80954    0.48885   3.702 0.000214 ***
+DistanceFromHome                0.03212    0.01599   2.009 0.044504 *  
+JobInvolvement                 -0.58179    0.18703  -3.111 0.001867 ** 
+
+reviewing the coeficiencts output - all execpt JobRole are significant. 
+
+We can interpret the predictor variables as such:
+When holding all other variables fixed, the odds of getting attrition for Overtime workers vs the odds of employee attrition for non-OT worksers is exp(1.88546) = 6.59. In other words, the odds for OT workers are 6 time higher than odds for non OT worksers, in the fitted model when holding all other variables fixed. 
+
+
+...ect..
+
+
+the updated logistic regression model provided the following:
+- Sensitivity = 82%
+- specificity = 86%
+- Missclassificaiton rate = 14%
+
+
+
+
+based on the ANOVA Chi2 test, we can see that all predictor variables maintain a significant effect on the model residuals. Note Job Role is borderline non-significant, we kept this in the model because of this informaiton these values provide to the overall model. 
+
+```{r}
+submission_  = read.csv("./data/CaseStudy2CompSet No Attrition.csv")
+submission_$MonthlyIncome = log(submission_$MonthlyIncome)
+
+submission_pred = predict(logit_model, newdata=submission_, type='response')
+submission_pred = ifelse(submission_pred > 0.5 ,"Yes","No")
+final_submission = data.table(ID=submission_$ID, Attrition=submission_pred)
+write.table(final_submission, "./data/Case2PredictionsPhillip Attrition.csv", sep=",", row.names=F)
+```
+
+## Random Forest
+
+
+```{r}
+library(randomForest)
+#rf = randomForest(formula(stepwise), data = train,proximity=TRUE,mtry=2, importance=TRUE )
+rf = randomForest(Attrition ~ OverTime+MonthlyIncome  +JobLevel+ MaritalStatus + TotalWorkingYears +StockOptionLevel + YearsWithCurrManager+YearsAtCompany + Age 
+                  , data = train,proximity=TRUE,mtry=2, importance=TRUE )
+print(rf)
+rf_pred = predict(rf,newdata=test, type="class")
+rf_pred = ifelse(rf_pred > 0.5,1,0)
+
+
+cm = table(rf_pred, test$Attrition)
+print(mean(rf_pred==test$Attrition))
+print(cm)
+
+tn = cm[1]
+fn = cm[2]
+fp = cm[3]
+tp = cm[4]
+
+
+
+
+sensitivity = tp / (tp + fn)
+specificity = tn / (tn + fp)
+accuracy = (tp + tn) / (tp + tn + fp + fn)
+misclassification_rate = 1 - accuracy
+
+print(paste("sensitivity: ", round(sensitivity,2)))
+print(paste("specificity: ", round(specificity,2)))
+print(paste("accuracy: ", round(accuracy,2)))
+
+
+#confusionMatrix(rf_pred, test_Attrition)
+
+varImpPlot(rf, sort=T, n.var = 9, main = 'Key Variables')
+plot(rf)
+# https://www.r-bloggers.com/variable-importance-plot-and-variable-selection/
+(VI_F=importance(rf))
+barplot(t(VI_F/sum(VI_F)))
+```
+
+### KNN
+
+
+```{r}
+sepwise_variables = c("Attrition","Age","DistanceFromHome","JobInvolvement","JobLevel","JobSatisfaction",
+    "MonthlyIncome","TotalWorkingYears","TrainingTimesLastYear", 
+    "WorkLifeBalance","YearsSinceLastPromotion","YearsWithCurrManager", "JobRole")
+numerica_var = c("Attrition","Age","DistanceFromHome","JobInvolvement","JobLevel","JobSatisfaction",
+    "MonthlyIncome","TotalWorkingYears","TrainingTimesLastYear", 
+    "WorkLifeBalance","YearsSinceLastPromotion","YearsWithCurrManager")
+
+categorical_var = c("JobRole")
+
+knn_df = df[,sepwise_variables]
+knn_df = fastDummies::dummy_cols(knn_df, select_columns=categorical_var, remove_first_dummy=TRUE)
+knn_df = knn_df[,!(names(knn_df) %in% categorical_var)]
+
+colnames(knn_df)[which(colnames(knn_df) %in% c("JobRole_Manufacturing Director","JobRole_Research Director",
+                                               "JobRole_Research Scientist","JobRole_Sales Representative",
+                                               "JobRole_Healthcare Representative","JobRole_Human Resources",
+                                               "JobRole_Laboratory Technician") )] <- c("role_manf_direc","role_director",
+                                                            "role_science", "rolesales_rep", "role_healthrep",
+                                                            "role_HR", "role_lab"
+                                                                                                                )
+
+knn_df$travel_freq = ifelse(df$BusinessTravel == "Travel_Frequently", 1, 0)
+knn_df$male = ifelse(df$Gender == "Male", 1, 0)
+knn_df$OT = ifelse(df$OverTime == "Yes", 1, 0)
+
+
+paste(names(knn_df), collapse = " + ")
+
+```
+
+
+___test train__
+
+```{r}
+smp_size <- floor(0.7 * nrow(knn_df))
+
+## set the seed to make your partition reproducible
+set.seed(234)
+train_ind <- sample(seq_len(nrow(knn_df)), size = smp_size, replace=FALSE)
+
+train = knn_df[train_ind,]
+test =  knn_df[-train_ind,]
+dim(train)
+dim(test)
+```
+
+```{r}
+
+k3 = knn(train,test,cl=train$Attrition,k=20)
+confusionMatrix(table(test$Attrition,k3))
+
+```
+
+From the KNN we obtained an accuracy rating of 82% on the test dataset. The Sensitivy = 82% and the specificity = 66%. With the objective of predicting employees that left the company, the KNN model indicates the specificity rate is 67% which is appropriate. 
+
+
+
+## Naive Bayes
+
+```{r}
+library(e1071)
+nb = naiveBayes(Attrition ~ OverTime+MonthlyIncome  +JobLevel+ MaritalStatus + TotalWorkingYears +StockOptionLevel + YearsWithCurrManager+YearsAtCompany + Age, data=train)
+
+nb_pred = predict(nb, newdata=test)
+#nb_pred = ifelse(nb_pred > 0.5,1,0)
+#table(nb_pred, test$Attrition)
+
+
+```
+
+
+
+
+# Objective 2 Salary Prediction
+
+```{r}
+stepwise = step(glm(MonthlyIncome ~ ., data=df), direction='both', trace=0)
+formula(stepwise)
+summary(stepwise)
+```
+
+
+
+
+___test train__
+
+```{r}
+df$TotalWorkingYears_log = log(df$TotalWorkingYears_log+0.5)
+
+smp_size <- floor(0.7 * nrow(df))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(df)), size = smp_size)
+
+train = df[train_ind,]
+test =  df[-train_ind,]
+dim(train)
+dim(test)
+```
+
+```{r}
+lm_model <- lm(MonthlyIncome ~ JobLevel+JobRole+Attrition + TotalWorkingYears_log, data=train)
+print(summary(lm_model))
+
+plot(lm_model)
+
+library(tidyverse)
+# http://www.sthda.com/english/articles/38-regression-model-validation/158-regression-model-accuracy-metrics-r-square-aic-bic-cp-and-more/
+lm_pred <- exp(predict(lm_model, test))
+score = data.frame(
+  AdjR2 = (summary(lm_model)$adj.r.squared),
+  RMSE = RMSE(lm_pred, exp(test$MonthlyIncome)),
+  AIC =  (extractAIC(lm_model))
+)
+
+score
+
+```
+
+
+To assess the assumptions being met, we considered the following that is presinted above in the diagnostic plots:
+* Normality - QQ plots show the residual fitting well on linear line, some small deviations from the lower tail, but nothing to be conserned. assumption met
+* Independence - the data discription did not present any concerns that the data fails independence - assumption met
+* equal variance - after the log transformaiton on `TotalWorkingYears` provided better output in the residual v fits plot that provides indicate of equal variance. Additionally, in the leverage plot, there are no significant concerns regarding leverage and influence that could violate this assumption. While we note the leverage plot call out potential outlier, this appears to be no significant concern - assumption ment
+
+
+
+R-squared is approximately 90% indicating 90% of the variation in salary can be explained by the model. 
+RMSE value of 1312 which is a measure of distance the residuals (prediction errors. Are spread apart.
+AIC score of -1877 which was the lowest score indicating the best model to select. 
+
+More details
+Overall significant test from the F-statistic (497) with p-value <0.001 showing overall signficancec of the model. 
+Slope for is the effect of JobLevel is 0.35 indicating the effect job level has on salary adjusting for the other varaibales, we associate a one-unit increase in JobLevel, we can expect to see about a 43% increase in the geometric mean of Monthly Income, since exp(0.3538) = 1.430
+
+
+
+```{r}
+library(readxl)
+salary_submission = read_excel("./data/CaseStudy2CompSet No Salary.xlsx")
+salary_submission$Attrition = as.numeric(as.factor(salary_submission$Attrition))-1
+salary_submission$TotalWorkingYears_log = log(salary_submission$TotalWorkingYears+0.5)
+
+submission_pred = exp(predict(lm_model, newdata=salary_submission))
+final_submission = data.table(ID=salary_submission$ID, MonthlyIncome=submission_pred)
+write.table(final_submission, "./data/Case2PredictionsPhillip Salary.csv", sep=",", row.names=F)
+
+```
+
+
+
+
+
+
+```{r}
+gg <- ggplot(df, aes(x=exp(MonthlyIncome), y=TotalWorkingYears)) + 
+  geom_point(aes(col=JobLevel)) + 
+  geom_smooth(method="loess", se=F) + 
+  labs( 
+       y="TotalWorkingYears", 
+       x="MonthlyIncome", 
+       title="Scatterplot of Monthly Income vs TotalWorking Years")
+
+plot(gg)
+```
+
+The scatterplot above shows a clear indicate that monthly income and Total Working years are related as well as JobLevel. Each of these are positively correlated. 
+
+
+
+
+
+
+```{r}
+```
+
+
+
