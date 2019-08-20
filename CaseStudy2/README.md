@@ -10,6 +10,8 @@ We have been hired by the __DDSAnalytics__ that specializes in talent management
 
 
 __Executive Summary__
+Please refer to this youtube clip for recorded presentation (<5mins) - https://www.youtube.com/watch?v=_qAkuMxDMnU
+
 In summary to the objective, we found:
 
 * Employee attrition– whre employees that were most likely to turnover are those that (1) most importantly workovertime and (2) have lower salaries. Also, we saw decreased in job involvement and increased time_till_promotion. 
