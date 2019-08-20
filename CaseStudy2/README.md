@@ -10,7 +10,9 @@ We have been hired by the __DDSAnalytics__ that specializes in talent management
 
 
 __Executive Summary__
-Please refer to this youtube clip for recorded presentation (<5mins) - https://www.youtube.com/watch?v=_qAkuMxDMnU
+Please refer to this youtube clip for recorded presentation (<5mins) 
+
+[![CaseStudy 2 DDS](http://img.youtube.com/vi/_qAkuMxDMnU/0.jpg)](http://www.youtube.com/watch?v=_qAkuMxDMnU "2019 Employee Report")
 
 In summary to the objective, we found:
 
